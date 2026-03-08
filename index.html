@@ -88,6 +88,38 @@
 
     #clear-completed:hover { background: #fdecea; }
 
+    /* Progress bar */
+    .progress-wrap {
+      margin-bottom: 14px;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: #999;
+      margin-bottom: 5px;
+    }
+
+    .progress-header strong {
+      color: #6c63ff;
+      font-size: 0.9rem;
+    }
+
+    .progress-track {
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6c63ff, #a78bfa);
+      border-radius: 99px;
+      transition: width 0.4s cubic-bezier(.4,0,.2,1);
+    }
+
     /* Filter tabs */
     .filters {
       display: flex;
@@ -100,14 +132,19 @@
 
     .filter-btn {
       flex: 1;
-      padding: 8px;
+      padding: 8px 4px;
       border: none;
       background: transparent;
       border-radius: 7px;
       cursor: pointer;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       color: #666;
       transition: background 0.2s, color 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      line-height: 1;
     }
 
     .filter-btn.active {
@@ -116,6 +153,31 @@
       font-weight: 600;
       box-shadow: 0 1px 4px rgba(0,0,0,0.1);
     }
+
+    .filter-btn .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      background: #e0e0ee;
+      color: #888;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .filter-btn.active .badge {
+      background: #6c63ff;
+      color: #fff;
+    }
+
+    .filter-btn[data-filter="active"] .badge   { background: #e8f5e9; color: #43a047; }
+    .filter-btn[data-filter="active"].active .badge { background: #43a047; color: #fff; }
+    .filter-btn[data-filter="completed"] .badge { background: #ede7f6; color: #7e57c2; }
+    .filter-btn[data-filter="completed"].active .badge { background: #7e57c2; color: #fff; }
 
     /* Todo list */
     #todo-list {
@@ -241,10 +303,26 @@
     <button id="clear-completed">完了済みを削除</button>
   </div>
 
+  <div class="progress-wrap">
+    <div class="progress-header">
+      <span>進捗</span>
+      <strong id="progress-pct">0%</strong>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+
   <div class="filters">
-    <button class="filter-btn active" data-filter="all">すべて</button>
-    <button class="filter-btn" data-filter="active">未完了</button>
-    <button class="filter-btn" data-filter="completed">完了済み</button>
+    <button class="filter-btn active" data-filter="all">
+      すべて<span class="badge" id="badge-all">0</span>
+    </button>
+    <button class="filter-btn" data-filter="active">
+      未完了<span class="badge" id="badge-active">0</span>
+    </button>
+    <button class="filter-btn" data-filter="completed">
+      完了済み<span class="badge" id="badge-completed">0</span>
+    </button>
   </div>
 
   <ul id="todo-list"></ul>
@@ -257,12 +335,17 @@
   let filter = 'all';
   let dragSrcIndex = null;
 
-  const listEl    = document.getElementById('todo-list');
-  const inputEl   = document.getElementById('new-todo');
-  const addBtn    = document.getElementById('add-btn');
-  const remaining = document.getElementById('remaining');
-  const emptyMsg  = document.getElementById('empty-msg');
-  const clearBtn  = document.getElementById('clear-completed');
+  const listEl       = document.getElementById('todo-list');
+  const inputEl      = document.getElementById('new-todo');
+  const addBtn       = document.getElementById('add-btn');
+  const remaining    = document.getElementById('remaining');
+  const emptyMsg     = document.getElementById('empty-msg');
+  const clearBtn     = document.getElementById('clear-completed');
+  const badgeAll       = document.getElementById('badge-all');
+  const badgeActive    = document.getElementById('badge-active');
+  const badgeCompleted = document.getElementById('badge-completed');
+  const progressFill   = document.getElementById('progress-fill');
+  const progressPct    = document.getElementById('progress-pct');
 
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
@@ -358,9 +441,18 @@
       listEl.appendChild(li);
     });
 
-    const activeCount = todos.filter(t => !t.done).length;
-    remaining.textContent = `${activeCount}件 残り`;
-    emptyMsg.style.display = visible.length === 0 ? 'block' : 'none';
+    const totalCount    = todos.length;
+    const activeCount   = todos.filter(t => !t.done).length;
+    const doneCount     = todos.filter(t => t.done).length;
+    const pct           = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+
+    remaining.textContent     = `${activeCount}件 残り`;
+    badgeAll.textContent       = totalCount;
+    badgeActive.textContent    = activeCount;
+    badgeCompleted.textContent = doneCount;
+    progressFill.style.width   = pct + '%';
+    progressPct.textContent    = pct + '%';
+    emptyMsg.style.display     = visible.length === 0 ? 'block' : 'none';
   }
 
   function addTodo() {
