@@ -287,6 +287,114 @@
       padding: 40px 0;
       font-size: 0.95rem;
     }
+
+    /* Loading modal overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 18, 40, 0.45);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 36px 44px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      transform: scale(0.9);
+      transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+    }
+
+    .modal-overlay.visible .modal-box {
+      transform: scale(1);
+    }
+
+    .spinner {
+      width: 52px;
+      height: 52px;
+      border: 5px solid #e8e8f0;
+      border-top-color: #6c63ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .modal-label {
+      font-size: 1rem;
+      color: #555;
+      font-weight: 500;
+    }
+
+    .modal-task-name {
+      font-size: 0.9rem;
+      color: #6c63ff;
+      font-weight: 700;
+      max-width: 240px;
+      text-align: center;
+      word-break: break-word;
+      background: #f0eeff;
+      padding: 4px 12px;
+      border-radius: 99px;
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1a1a2e;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 99px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s cubic-bezier(.4,0,.2,1);
+      z-index: 999;
+      white-space: nowrap;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast-icon {
+      width: 20px;
+      height: 20px;
+      background: #6c63ff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -329,23 +437,43 @@
   <p class="empty" id="empty-msg" style="display:none">タスクがありません</p>
 </div>
 
+<!-- Loading modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <div class="spinner"></div>
+    <div class="modal-label">タスクを追加しています…</div>
+    <div class="modal-task-name" id="modal-task-name"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <div class="toast-icon">✓</div>
+  <span id="toast-msg"></span>
+</div>
+
 <script>
   const STORAGE_KEY = 'todo-app-v1';
   let todos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
   let filter = 'all';
   let dragSrcIndex = null;
 
-  const listEl       = document.getElementById('todo-list');
-  const inputEl      = document.getElementById('new-todo');
-  const addBtn       = document.getElementById('add-btn');
-  const remaining    = document.getElementById('remaining');
-  const emptyMsg     = document.getElementById('empty-msg');
-  const clearBtn     = document.getElementById('clear-completed');
+  const listEl         = document.getElementById('todo-list');
+  const inputEl        = document.getElementById('new-todo');
+  const addBtn         = document.getElementById('add-btn');
+  const remaining      = document.getElementById('remaining');
+  const emptyMsg       = document.getElementById('empty-msg');
+  const clearBtn       = document.getElementById('clear-completed');
   const badgeAll       = document.getElementById('badge-all');
   const badgeActive    = document.getElementById('badge-active');
   const badgeCompleted = document.getElementById('badge-completed');
   const progressFill   = document.getElementById('progress-fill');
   const progressPct    = document.getElementById('progress-pct');
+  const modalOverlay   = document.getElementById('modal-overlay');
+  const modalTaskName  = document.getElementById('modal-task-name');
+  const toastEl        = document.getElementById('toast');
+  const toastMsg       = document.getElementById('toast-msg');
+  let toastTimer       = null;
 
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
@@ -455,12 +583,36 @@
     emptyMsg.style.display     = visible.length === 0 ? 'block' : 'none';
   }
 
-  function addTodo() {
+  function showToast(msg) {
+    toastMsg.textContent = msg;
+    toastEl.classList.add('visible');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('visible'), 2500);
+  }
+
+  async function addTodo() {
     const text = inputEl.value.trim();
     if (!text) return;
-    todos.unshift({ id: Date.now(), text, done: false });
+
+    // Show loading modal
+    modalTaskName.textContent = `「${text}」`;
+    modalOverlay.classList.add('visible');
     inputEl.value = '';
-    save(); render();
+
+    // Simulate 2–3 second processing
+    const delay = 2000 + Math.random() * 1000;
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    // Actually add the todo
+    todos.unshift({ id: Date.now(), text, done: false });
+    save();
+    render();
+
+    // Hide modal
+    modalOverlay.classList.remove('visible');
+
+    // Show success toast
+    showToast(`「${text}」を追加しました`);
   }
 
   function toggle(index) {
